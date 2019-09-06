@@ -8,7 +8,7 @@ connection_string = pyodbc.connect(
 cursor: object = connection_string.cursor()
 
 # Create PassedApplicants table
-create_passed_applicants_table = 'CREATE TABLE PassedApplicants([Id] [int] NOT NULL, [Position] [real] NULL, [ApplicationId] [nvarchar](200) NOT NULL, [Roll] [nvarchar](max) NULL,[UnitName] [nvarchar](200) NOT NULL,[TotalMarks] [real] NULL,[PhoneNumber] [nvarchar](max) NULL,[Name] [nvarchar](max) NULL,[Father] [nvarchar](max) NULL,[Photo] [nvarchar](max) NULL,[QuotaName] [nvarchar](450) NULL, [AllottedDepartment] [nvarchar](450) NULL, [UpdatedDate] [nvarchar](450) NULL, [IsAutoMigrationOff] [bit] null, [IsAdmissionCancelled] [bit] null,)'
+create_passed_applicants_table = 'CREATE TABLE PassedApplicants([Id] [int] NOT NULL, [Position] [real] NULL, [ApplicationId] [nvarchar](200) NOT NULL, [Roll] [nvarchar](max) NULL,[UnitName] [nvarchar](200) NOT NULL,[TotalMarks] [real] NULL,[PhoneNumber] [nvarchar](max) NULL,[Name] [nvarchar](max) NULL,[Father] [nvarchar](max) NULL,[Photo] [nvarchar](max) NULL,[QuotaName] [nvarchar](450) NULL, [AllottedDepartment] [nvarchar](450) NULL, [UpdatedDate] [nvarchar](450) NULL, [IsAutoMigrationOff] [bit] null, [IsAdmissionCancelled] [bit] null, [Remarks] [nvarchar](450) NULL,)'
 cursor.execute(create_passed_applicants_table)
 
 # Create Departments table
