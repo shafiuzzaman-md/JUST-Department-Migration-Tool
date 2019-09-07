@@ -42,7 +42,7 @@ def get_applicants(unit):
     logging.info(
         "Getting Applicants who did not cancelled admission and did not initiate Auto Migration OFF of Unit " + unit)
     cursor.execute(
-        f"SELECT * FROM [PassedApplicants] WHERE IsAdmissionCancelled != 1 and [IsAutoMigrationOff] != 1 and UnitName ='{unit}'")
+        f"SELECT * FROM [PassedApplicants] WHERE IsAdmissionCancelled != 1 and [IsAutoMigrationOff] != 1 and ([IsAdmissionConfirmed] is NULL or [IsAdmissionConfirmed] = 1)  and UnitName ='{unit}'")
     columns = [column[0] for column in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -59,9 +59,9 @@ def get_first_position(unit):
 def get_allotted_subject_order(application_id):
     logging.info("Getting order of allotted department...")
     cursor.execute(
-        "SELECT AllottedDepartmentOrder FROM PassedApplicants WHERE Id ='%s'" % application_id)
+        "SELECT AllottedDepartmentOrder, Id FROM PassedApplicants WHERE Id ='%s'" % application_id)
     for row in cursor.fetchall():
-        return row[0]
+        return row[0], row[1]
 
 
 def get_subject_choices_by_id(application_id: object) -> object:
@@ -91,7 +91,7 @@ def get_departments():
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
-def allocate_subject(application_table_id, applicant_position, allotted_subject_order):
+def allocate_subject(application_table_id, applicant_position, prev_department_order, prev_department_id):
     choices = get_subject_choices_by_id(application_table_id)
     number_of_choices = len(choices)
     logging.info("No. of Choices: " + str(number_of_choices))
@@ -104,13 +104,20 @@ def allocate_subject(application_table_id, applicant_position, allotted_subject_
         logging.info("Admission is being cancelled as ")
         return "did not fill up the choice form"
     order = 1
-    while order <= number_of_choices and order < allotted_subject_order:
+    while order <= number_of_choices and order < prev_department_order:
         subject_id = get_subject_id_by_order(application_table_id, order)
         seat_status, total_seats, allotted_seats, department_name = get_department_status_by_id(subject_id)
         logging.info(
             str(order) + ": " + str(department_name) + " Total Seats: " + str(total_seats) + " Allotted Seats: " + str(
                 allotted_seats))
         if seat_status is True and allotted_seats < total_seats and total_seats is not 0:
+            print(prev_department_id)
+            if prev_department_id is not None:
+                p_seat_status, p_total_seats, p_allotted_seats, p_department_name = get_department_status_by_id(prev_department_id)
+                p_seat_status = True
+                p_allotted_seats = p_allotted_seats - 1
+                cursor.execute("UPDATE Departments SET [SeatStatus] = ?, [AllottedSeats] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
+                               p_seat_status, p_allotted_seats, x.strftime("%d%b%I%M%p"), prev_department_id)
             cursor.execute(
                 "UPDATE [PassedApplicants] SET [AllottedDepartment] = ?, [AllottedDepartmentOrder] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
                 department_name, order, x.strftime("%d%b%I%M%p"), application_table_id)
@@ -186,14 +193,15 @@ if __name__ == '__main__':
             logging.info("Migration Started for Position " + str(position))
             applicant_id = get_applicant_id_by_position(position)
             logging.info("Id: " + str(applicant_id))
-            allotted_subject_order = get_allotted_subject_order(applicant_id)
+            allotted_subject_order, allotted_subject_id = get_allotted_subject_order(applicant_id)
             logging.info("Order of currently allotted department: ")
             logging.info(allotted_subject_order)
+            logging.info("currently allotted sub id " + str(allotted_subject_id))
             if allotted_subject_order is None:
                 allotted_subject_order = math.inf
                 logging.info("No department is allotted yet")
-            if applicant_id is not None or allotted_subject_order is 1:
-                department = allocate_subject(applicant_id, position, allotted_subject_order)
+            if applicant_id is not None and allotted_subject_order > 1:
+                department = allocate_subject(applicant_id, position, allotted_subject_order, allotted_subject_id)
                 logging.info("Position " + str(position) + " " + department)
                 cursor.commit()  # Commit db changes
             position = position + 1
