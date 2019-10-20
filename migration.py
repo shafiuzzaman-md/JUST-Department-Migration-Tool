@@ -21,16 +21,20 @@ department_ws = wb.create_sheet("Department Status")
 applicants_ws = wb.create_sheet("Applicants Status")
 
 
-def backup_db(path) -> object:
+def backup_db() -> object:
     currentDirectory = os.getcwd()
-    print(currentDirectory)
-    print("Database backup started...")
+    # print(currentDirectory)
+    # print("Database backup started...")
     logging.info("Database backup started...")
     connection_string.autocommit = True
-    backup_file = "'" + str(currentDirectory) + "\\" + "db" + str(datetime.now().strftime("%d_%b_%I_%M_%p")) + ".bak'"
-    sql = "BACKUP DATABASE [Admission2019] TO DISK = N" + backup_file
-    cursor.execute(sql)
-    connection_string.autocommit = False
+    backup_file = currentDirectory + "\\" + "db" + str(datetime.now().strftime("%d_%b_%I_%M_%p")) + ".bak"
+    #sql = "BACKUP DATABASE [Admission2019] TO DISK = N" + backup_file
+    query = "backup database [Admission2019] to disk = '%s'" % backup_file
+    cursor.execute(query)
+    cursor.commit()
+    #connection_string.close()
+    #cursor.execute(sql)
+    #connection_string.autocommit = False
     logging.info("Find the backup file in " + backup_file)
     print("Database backup finished...")
     logging.info("Database backup finished...")
@@ -38,11 +42,10 @@ def backup_db(path) -> object:
 
 # Getting Applicants who did not cancelled admission and did not initiate Auto Migration OFF of Unit
 def get_applicants(unit):
-    print("Getting Applicants who did not cancelled admission and did not initiate Auto Migration OFF of Unit " + unit)
     logging.info(
         "Getting Applicants who did not cancelled admission and did not initiate Auto Migration OFF of Unit " + unit)
     cursor.execute(
-        f"SELECT * FROM [PassedApplicants] WHERE IsAdmissionCancelled != 1 and [IsAutoMigrationOff] != 1 and ([IsAdmissionConfirmed] is NULL or [IsAdmissionConfirmed] = 1)  and UnitName ='{unit}'")
+        f"SELECT * FROM [PassedApplicants] WHERE IsAdmissionCancelled != 1 and [IsAutoMigrationOff] != 1  and UnitName ='{unit}'")
     columns = [column[0] for column in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -59,7 +62,7 @@ def get_first_position(unit):
 def get_allotted_subject_order(application_id):
     logging.info("Getting order of allotted department...")
     cursor.execute(
-        "SELECT AllottedDepartmentOrder, Id FROM PassedApplicants WHERE Id ='%s'" % application_id)
+        "SELECT AllottedDepartmentOrder, AllottedDepartmentId FROM PassedApplicants WHERE Id ='%s'" % application_id)
     for row in cursor.fetchall():
         return row[0], row[1]
 
@@ -91,18 +94,11 @@ def get_departments():
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
-def allocate_subject(application_table_id, applicant_position, prev_department_order, prev_department_id):
+def allocate_subject(application_table_id, prev_department_order, prev_department_id):
     choices = get_subject_choices_by_id(application_table_id)
     number_of_choices = len(choices)
     logging.info("No. of Choices: " + str(number_of_choices))
     x = datetime.now()
-    # Make IsAdmissionCancelled True for the applicant who did not fill up the choice form
-    if number_of_choices == 0:
-        cursor.execute(
-            "UPDATE [PassedApplicants] SET [IsAdmissionCancelled] = ?, [UpdatedDate] = ?, [Remarks] = ? WHERE [Id] = ?",
-            1, x.strftime("%d%b%I%M%p"), "Did not fill up the choice form", application_table_id)
-        logging.info("Admission is being cancelled as ")
-        return "did not fill up the choice form"
     order = 1
     while order <= number_of_choices and order < prev_department_order:
         subject_id = get_subject_id_by_order(application_table_id, order)
@@ -111,27 +107,27 @@ def allocate_subject(application_table_id, applicant_position, prev_department_o
             str(order) + ": " + str(department_name) + " Total Seats: " + str(total_seats) + " Allotted Seats: " + str(
                 allotted_seats))
         if seat_status is True and allotted_seats < total_seats and total_seats is not 0:
-            print(prev_department_id)
-            if prev_department_id is not None:
-                p_seat_status, p_total_seats, p_allotted_seats, p_department_name = get_department_status_by_id(prev_department_id)
+            if prev_department_id is not 0:
+                logging.info("Previously allotted department id: " + str(prev_department_id))
+                p_seat_status, p_total_seats, p_allotted_seats, p_department_name = get_department_status_by_id(
+                    prev_department_id)
                 p_seat_status = True
                 p_allotted_seats = p_allotted_seats - 1
-                cursor.execute("UPDATE Departments SET [SeatStatus] = ?, [AllottedSeats] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
-                               p_seat_status, p_allotted_seats, x.strftime("%d%b%I%M%p"), prev_department_id)
+                cursor.execute(
+                    "UPDATE Departments SET [SeatStatus] = ?, [AllottedSeats] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
+                    p_seat_status, p_allotted_seats, x.strftime("%d%b%I%M%p"), prev_department_id)
+
             cursor.execute(
-                "UPDATE [PassedApplicants] SET [AllottedDepartment] = ?, [AllottedDepartmentOrder] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
-                department_name, order, x.strftime("%d%b%I%M%p"), application_table_id)
+                "UPDATE [PassedApplicants] SET [AllottedDepartmentId] = ?, [AllottedDepartment] = ?, [AllottedDepartmentOrder] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
+                subject_id,department_name, order, x.strftime("%d%b%I%M%p"), application_table_id)
+
             allotted_seats = allotted_seats + 1
-            cursor.execute("UPDATE Departments SET [AllottedSeats] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
-                           allotted_seats, x.strftime("%d%b%I%M%p"), subject_id)
-            if allotted_seats == 1:
-                cursor.execute(
-                    "UPDATE Departments SET [AllottedSeats] = ?, [StartingPosition] = ?,  [UpdatedDate] = ? WHERE [Id] = ?",
-                    allotted_seats, applicant_position, x.strftime("%d%b%I%M%p"), subject_id)
             if allotted_seats == total_seats:
-                cursor.execute(
-                    "UPDATE Departments SET [EndingPosition] = ?, [SeatStatus] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
-                    applicant_position, 0, x.strftime("%d%b%I%M%p"), subject_id)
+                seat_status = False
+
+            cursor.execute(
+                "UPDATE Departments SET [SeatStatus] = ?, [AllottedSeats] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
+                seat_status, allotted_seats, x.strftime("%d%b%I%M%p"), subject_id)
             return department_name
         else:
             order = order + 1
@@ -149,88 +145,106 @@ def write_department_data_to_excel(department_data):
     logging.info("Writing department to excel......")
     # write header
     department_ws.append(
-        ["Department", "Unit", "Total Seats", "Allotted Seats", "Seat Status", "Starting Position", "Ending Position"])
+        ["Department", "Unit", "Total Seats", "Allotted Seats", "Seat Status", "UpdatedDate"])
     # write data
     for department in department_data:
         department_ws.append(
-            [department[2], department[3], department[4], department[5], department[6], department[7], department[8]])
+            [department[2], department[3], department[4], department[5], department[6], department[7]])
 
 
 def write_migration_data_to_excel(applicants_data):
     logging.info("Writing migration data to excel......")
     print("Writing migration data to excel......")
     # write header
-    migration_ws.append(["Position", "Name", "ApplicationId", "Roll", "Phone", "Unit", "Department"])
+    migration_ws.append(
+        ["Position", "Name", "ApplicationId", "Roll", "Phone", "Unit", "Department", "Allotted Department Order",
+         "Auto Migration OFF", "Updated Date"])
     # write data
     for applicant in applicants_data:
         migration_ws.append(
-            [applicant[1], applicant[7], applicant[2], applicant[3], applicant[6], applicant[4], applicant[11]])
+            [applicant[1], applicant[7], applicant[2], applicant[3], applicant[6], applicant[4], applicant[12],
+             applicant[13], applicant[16], applicant[14]])
 
 
-if __name__ == '__main__':
-    unit_name = input("Unit Name(Press A/B/C/D/E/F): ")
+def execute_migration(unit_name) -> object:
+    # unit_name = input("Unit Name(Press A/B/C/D/E/F): ")
+    global no_of_vacant_departments
     unit_name = unit_name.upper()
-
-    drive = input("In which drive do you want to save migration results: ")
+    # drive = input("In which drive do you want to save migration results: ")
+    drive = "F"
     os.chdir(drive + ':')  # change directory
     path: object = "Unit_" + unit_name + "_Migration" + str(datetime.now().strftime("_%d_%b_%I_%M_%p"))
     if not os.path.exists(path):
         os.makedirs(path)
     os.chdir(path)
-    print("Find migration results in " + str(drive.upper()) + ":\\" + str(path))
+    result = "Find migration results in " + str(drive.upper()) + ":\\" + str(path)
     logging.basicConfig(filename="info.log", format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S',
                         level=logging.INFO)
     if unit_name == 'A' or unit_name == 'B' or unit_name == 'C' or unit_name == 'D' or unit_name == 'E' or unit_name == 'F':
-        backup_db(path)
+        backup_db()
         applicants = get_applicants(unit_name)
-        position = get_first_position(unit_name)  # get starting position of migration
-        logging.info("Starting Position: " + str(position))
         no_of_applicants = len(applicants)
         logging.info("Total: " + str(no_of_applicants))
+
+        position = get_first_position(unit_name)  # get starting position of migration
+        logging.info("Starting Position: " + str(position))
+
         while True:
+            get_no_of_vacant_departments = "SELECT COUNT(SeatStatus) FROM Departments WHERE SeatStatus = 1"
+            cursor.execute(get_no_of_vacant_departments)
+            for row in cursor.fetchall():
+                no_of_vacant_departments = row[0]
+            logging.info(no_of_vacant_departments)
+
+            if no_of_applicants is 0:
+                logging.info("No applicant remains")
+                break
+            if no_of_vacant_departments is 0:
+                logging.info("No vacant department remains")
+                break
+
             logging.info(
                 "---------------------------------" + str(no_of_applicants) + " remains ------------------------------")
             logging.info("Migration Started for Position " + str(position))
             applicant_id = get_applicant_id_by_position(position)
             logging.info("Id: " + str(applicant_id))
+
             allotted_subject_order, allotted_subject_id = get_allotted_subject_order(applicant_id)
-            logging.info("Order of currently allotted department: ")
-            logging.info(allotted_subject_order)
-            logging.info("currently allotted sub id " + str(allotted_subject_id))
-            if allotted_subject_order is None:
+
+            if allotted_subject_order is 0:
                 allotted_subject_order = math.inf
                 logging.info("No department is allotted yet")
+            else:
+                logging.info("Order of currently allotted department: ")
+                logging.info(allotted_subject_order)
+                logging.info("currently allotted sub id " + str(allotted_subject_id))
+
             if applicant_id is not None and allotted_subject_order > 1:
-                department = allocate_subject(applicant_id, position, allotted_subject_order, allotted_subject_id)
+                department = allocate_subject(applicant_id, allotted_subject_order, allotted_subject_id)
                 logging.info("Position " + str(position) + " " + department)
                 cursor.commit()  # Commit db changes
+
             position = position + 1
             no_of_applicants = no_of_applicants - 1
-            get_no_of_vacant_departments = "SELECT COUNT(SeatStatus) FROM Departments WHERE SeatStatus = 1"
-            cursor.execute(get_no_of_vacant_departments)
-            for row in cursor.fetchall():
-                no_of_vacant_departments = row[0]
-            assert isinstance(no_of_vacant_departments, object)
-            logging.info(no_of_vacant_departments)
-            if no_of_applicants is 0 or no_of_vacant_departments is 0:
-                break
 
         logging.info("Exporting migration result into excel....")
-        print("Exporting migration result into excel....")
-        get_applicants_query = " SELECT * FROM PassedApplicants WHERE IsAdmissionCancelled = 0 AND AllottedDepartment IS NOT NULL ORDER By Position asc"
-        migration_data = cursor.execute(get_applicants_query)
+        # get_applicants_query = " SELECT * FROM PassedApplicants WHERE IsAdmissionCancelled = 0 AND AllottedDepartment IS NOT NULL ORDER By Position asc"
+        migration_data = cursor.execute(
+            'SELECT * FROM PassedApplicants WHERE IsAdmissionCancelled = 0 AND AllottedDepartment IS NOT NULL and UnitName =\'%s\' ORDER By Position asc' % unit_name)
+        # migration_data = cursor.execute(get_applicants_query)
         write_migration_data_to_excel(migration_data)
 
         logging.info("Exporting department status into excel....")
-        print("Exporting department status into excel....")
-        get_departments_query = " SELECT * FROM Departments"
-        department_data = cursor.execute(get_departments_query)
+        # get_departments_query = " SELECT * FROM Departments"
+        department_data = cursor.execute(
+            ' SELECT * FROM Departments WHERE UnitName =\'%s\'' % unit_name)
+        # department_data = cursor.execute(get_departments_query)
         write_department_data_to_excel(department_data)
 
         migration_result = "Migration.xlsx"
         wb.save(migration_result)
         logging.info("Find excel file into " + migration_result)
-        print("Find excel file into " + migration_result)
+        result = "Migration is completed successfully! " + result
+        return result
     else:
         logging.warning("Invalid Unit Name: " + unit_name)
-        print("Invalid Unit Name")
