@@ -50,20 +50,20 @@ class UI(wx.Frame):
         self.Centre()
 
     def OnConfirmAdmissionButtonPressed(self, e):
-        result, rolls = process_admission(unit, "confirm")
-        msg = "Admissions are confirmed successfully" + str(rolls)
+        result, positions = process_admission(unit, "confirm")
+        msg = unit + " unit admissions are confirmed successfully for merit position" + str(positions)
         wx.MessageBox(msg, 'Info', wx.OK | wx.ICON_INFORMATION)
         self.Close()
 
     def OnStopAutoMigrationButtonPressed(self, e):
-        result, rolls = process_admission(unit, "stop_migration")
-        msg = "Stop auto migration requests are executed successfully" + str(rolls)
+        result, positions = process_admission(unit, "stop_migration")
+        msg = unit + " unit stop auto migration requests are executed successfully for position " + str(positions)
         wx.MessageBox(msg, 'Info', wx.OK | wx.ICON_INFORMATION)
         self.Close()
 
     def OnCancelAdmissionButton(self, e):
-        result, rolls = process_admission(unit, "cancel")
-        msg = "Admissions are cancelled successfully" + str(rolls)
+        result, positions = process_admission(unit, "cancel")
+        msg = unit + " unit admissions are cancelled successfully of position " + str(positions)
         wx.MessageBox(msg, 'Info', wx.OK | wx.ICON_INFORMATION)
         self.Close()
 

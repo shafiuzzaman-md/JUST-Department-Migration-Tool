@@ -24,9 +24,10 @@ connection_string = pyodbc.connect(
 cursor: object = connection_string.cursor()
 
 
-def get_allotted_subject_id(position):
+def get_allotted_subject_id(roll):
+    # sql = "SELECT AllottedDepartmentId FROM PassedApplicants WHERE Roll = " + str(roll)
     cursor.execute(
-        "SELECT AllottedDepartmentId FROM PassedApplicants WHERE Position ='%s'" % position)
+        "SELECT  AllottedDepartmentId FROM PassedApplicants WHERE Roll =?", roll)
     for row in cursor.fetchall():
         return row[0]
 
@@ -42,7 +43,7 @@ def get_non_confirmed_applicants(unit):
     logging.info(
         "Getting Applicants who did not confirmed admission of Unit " + unit)
     cursor.execute(
-        f"SELECT * FROM [PassedApplicants] WHERE IsAdmissionConfirmed != 1 and [AllottedDepartmentOrder] > 0 and [AllottedDepartmentId] > 0 and UnitName ='{unit}'")
+        f"SELECT * FROM [PassedApplicants] WHERE IsAdmissionCancelled != 1 AND IsAdmissionConfirmed != 1 AND [AllottedDepartmentOrder] > 0 AND [AllottedDepartmentId] > 0 AND UnitName ='{unit}'")
     columns = [column[0] for column in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -76,7 +77,7 @@ def getExcelOfAdmissionConfirm():
         logging.info("Roll" + str(roll))
         applicants_pos = str(applicants_pos) + str(pos) + ","
         str_unit = "'" + unit_name + "'"
-        sql = "UPDATE PassedApplicants SET [IsAdmissionConfirmed] = 1 WHERE [Position] = " + str(
+        sql = "UPDATE PassedApplicants SET [IsAdmissionConfirmed] = 1, [IsAdmissionCancelled] = 0 WHERE [IsAdmissionConfirmed] != 1 AND [Position] = " + str(
             pos) + " AND [Roll] = " + str(roll) + " AND [UnitName] = " + str_unit
         cursor.execute(sql)
         logging.info("Admission Confirmed")
@@ -84,19 +85,26 @@ def getExcelOfAdmissionConfirm():
     cursor.commit()
     non_confirmed_applicants = get_non_confirmed_applicants(unit_name)
     no_of_non_confirmed_applicants = len(non_confirmed_applicants)
-    logging.info("Total: " + str(no_of_non_confirmed_applicants))
+    logging.info("Total no of non-confirmed applicants so far: " + str(no_of_non_confirmed_applicants))
     for applicant in non_confirmed_applicants:
-        sql = "UPDATE PassedApplicants SET [IsAdmissionCancelled] = 1 WHERE [Position] = " + str(
-            applicant.get("Position")) + " AND [roll] = " + str(applicant.get("Roll")) + " AND [UnitName] = " + str_unit
-        cursor.execute(sql)
-        allotted_department_id = get_allotted_subject_id(applicant.get("Position"))
+        logging.info("Cancel subject of non-confirmed applicant with position : " + str(applicant.get("Position")))
+        roll = str(applicant.get("Roll"))
+        pos = str(applicant.get("Position"))
+        allotted_department_id = get_allotted_subject_id(roll)
+        logging.info("allotted_department_id : " + str(allotted_department_id))
         allotted_seats = get_department_status_by_id(allotted_department_id)
-        allotted_seats = allotted_seats - 1
-        seat_status = True
-        x = datetime.now()
-        cursor.execute(
-            "UPDATE Departments SET [SeatStatus] = ?, [AllottedSeats] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
-            seat_status, allotted_seats, x.strftime("%d%b%I%M%p"), allotted_department_id)
+        logging.info("allotted_seats : " + str(allotted_seats))
+
+        sql = "UPDATE PassedApplicants SET [IsAdmissionCancelled] = 1, [IsAdmissionConfirmed] = 0, [AllottedDepartmentOrder] = 0, [AllottedDepartmentId] = 0, [AllottedDepartment] = null  WHERE [Position] = " + pos + " AND [roll] = " + roll + " AND [UnitName] = " + str_unit
+        cursor.execute(sql)
+
+        if int(allotted_seats) > 0:
+            allotted_seats = int(allotted_seats) - 1
+            seat_status = True
+            x = datetime.now()
+            cursor.execute(
+                "UPDATE Departments SET [SeatStatus] = ?, [AllottedSeats] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
+                seat_status, allotted_seats, x.strftime("%d%b%I%M%p"), allotted_department_id)
     cursor.commit()
     root.destroy()
     return True
@@ -116,13 +124,22 @@ def getExcelOfStopAutoMigrations():
         logging.info("Roll" + str(roll))
         applicants_pos = str(applicants_pos) + str(pos) + ","
         str_unit = "'" + unit_name + "'"
-        sql = "UPDATE PassedApplicants SET [IsAutoMigrationOff] = 1 WHERE [Position] = " + str(
+        sql = "UPDATE PassedApplicants SET [IsAutoMigrationOff] = 1 WHERE [IsAutoMigrationOff] != 1 AND [Position] = " + str(
             pos) + " AND [roll] = " + str(roll) + " AND [UnitName] = " + str_unit
         cursor.execute(sql)
         index = index + 1
     cursor.commit()
     root.destroy()
     return True
+
+
+def check_if_admission_already_cancelled(roll, unit_name):
+    logging.info(
+        "Check if admission already cancelled ")
+    sql = "SELECT IsAdmissionCancelled FROM [PassedApplicants] WHERE Roll = " + str(roll) + " AND UnitName = '" + str(unit_name) +"'"
+    cursor.execute(sql)
+    for row in cursor.fetchall():
+        return row[0]
 
 
 def getExcelOfAdmissionCancel():
@@ -137,19 +154,23 @@ def getExcelOfAdmissionCancel():
         roll = int(roll_list[index])
         logging.info("Position: " + str(pos))
         logging.info("Roll" + str(roll))
-        applicants_pos = str(applicants_pos) + str(pos) + ","
-        str_unit = "'" + unit_name + "'"
-        allotted_department_id = get_allotted_subject_id(pos)
-        sql = "UPDATE PassedApplicants SET [IsAdmissionCancelled] = 1 WHERE [Position] = " + str(
-            pos) + " AND [roll] = " + str(roll) + " AND [UnitName] = " + str_unit
-        cursor.execute(sql)
-        allotted_seats = get_department_status_by_id(allotted_department_id)
-        allotted_seats = allotted_seats - 1
-        seat_status = True
-        x = datetime.now()
-        cursor.execute(
-            "UPDATE Departments SET [SeatStatus] = ?, [AllottedSeats] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
-            seat_status, allotted_seats, x.strftime("%d%b%I%M%p"), allotted_department_id)
+        cancelled = check_if_admission_already_cancelled(roll, unit_name)
+        if cancelled is False:
+            applicants_pos = str(applicants_pos) + str(pos) + ","
+            str_unit = "'" + unit_name + "'"
+            allotted_department_id = get_allotted_subject_id(roll)
+            allotted_seats = get_department_status_by_id(allotted_department_id)
+
+            sql = "UPDATE PassedApplicants SET [IsAdmissionCancelled] = 1, [IsAdmissionConfirmed] = 0, [AllottedDepartmentOrder] = 0, [AllottedDepartmentId] = 0, [AllottedDepartment] = null  WHERE [IsAdmissionCancelled] != 1 AND [Position] = " + str(
+                pos) + " AND [roll] = " + str(roll) + " AND [UnitName] = " + str_unit
+            cursor.execute(sql)
+            if allotted_seats > 0:
+                allotted_seats = allotted_seats - 1
+                seat_status = True
+                x = datetime.now()
+                cursor.execute(
+                    "UPDATE Departments SET [SeatStatus] = ?, [AllottedSeats] = ?, [UpdatedDate] = ? WHERE [Id] = ?",
+                    seat_status, allotted_seats, x.strftime("%d%b%I%M%p"), allotted_department_id)
         index = index + 1
     cursor.commit()
     root.destroy()
