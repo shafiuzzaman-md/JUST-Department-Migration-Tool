@@ -10,7 +10,7 @@ from numpy.distutils.fcompiler import none
 import logging
 
 unit_name = none;
-applicants_roll = 0;
+applicants_pos = ": ";
 
 root = tk.Tk()
 result = ""
@@ -63,7 +63,7 @@ def import_file():
 
 
 def getExcelOfAdmissionConfirm():
-    global applicants_roll
+    global applicants_pos
     position_list, roll_list = import_file()
     if not position_list:
         return False
@@ -74,7 +74,7 @@ def getExcelOfAdmissionConfirm():
         roll = int(roll_list[index])
         logging.info("Position: " + str(pos))
         logging.info("Roll" + str(roll))
-        applicants_roll = str(applicants_roll) + "," + str(roll)
+        applicants_pos = str(applicants_pos) + str(pos) + ","
         str_unit = "'" + unit_name + "'"
         sql = "UPDATE PassedApplicants SET [IsAdmissionConfirmed] = 1 WHERE [Position] = " + str(
             pos) + " AND [Roll] = " + str(roll) + " AND [UnitName] = " + str_unit
@@ -103,7 +103,7 @@ def getExcelOfAdmissionConfirm():
 
 
 def getExcelOfStopAutoMigrations():
-    global applicants_roll
+    global applicants_pos
     position_list, roll_list = import_file()
     if not position_list:
         return False
@@ -114,7 +114,7 @@ def getExcelOfStopAutoMigrations():
         roll = int(roll_list[index])
         logging.info("Position: " + str(pos))
         logging.info("Roll" + str(roll))
-        applicants_roll = str(applicants_roll) + "," + str(roll)
+        applicants_pos = str(applicants_pos) + str(pos) + ","
         str_unit = "'" + unit_name + "'"
         sql = "UPDATE PassedApplicants SET [IsAutoMigrationOff] = 1 WHERE [Position] = " + str(
             pos) + " AND [roll] = " + str(roll) + " AND [UnitName] = " + str_unit
@@ -126,7 +126,7 @@ def getExcelOfStopAutoMigrations():
 
 
 def getExcelOfAdmissionCancel():
-    global applicants_roll
+    global applicants_pos
     position_list, roll_list = import_file()
     if not position_list:
         return False
@@ -137,7 +137,7 @@ def getExcelOfAdmissionCancel():
         roll = int(roll_list[index])
         logging.info("Position: " + str(pos))
         logging.info("Roll" + str(roll))
-        applicants_roll = str(applicants_roll) + "," + str(roll)
+        applicants_pos = str(applicants_pos) + str(pos) + ","
         str_unit = "'" + unit_name + "'"
         allotted_department_id = get_allotted_subject_id(pos)
         sql = "UPDATE PassedApplicants SET [IsAdmissionCancelled] = 1 WHERE [Position] = " + str(
@@ -165,7 +165,7 @@ def process_admission(unit, admission_command):
     os.chdir(path)
     logging.basicConfig(filename="info.log", format='%(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S',
                         level=logging.INFO)
-    global unit_name, applicants_roll
+    global unit_name, applicants_pos
     unit_name = unit
     if admission_command == "confirm":
         browseButton_Excel = tk.Button(text='Import Excel File of Confirmed Applicants',
@@ -188,4 +188,4 @@ def process_admission(unit, admission_command):
 
     canvas1.create_window(150, 150, window=browseButton_Excel)
     root.mainloop()
-    return True, applicants_roll
+    return True, applicants_pos

@@ -51,19 +51,19 @@ class UI(wx.Frame):
 
     def OnConfirmAdmissionButtonPressed(self, e):
         result, rolls = process_admission(unit, "confirm")
-        msg = "Admissions are confirmed successfully: " + str(rolls)
+        msg = "Admissions are confirmed successfully" + str(rolls)
         wx.MessageBox(msg, 'Info', wx.OK | wx.ICON_INFORMATION)
         self.Close()
 
     def OnStopAutoMigrationButtonPressed(self, e):
         result, rolls = process_admission(unit, "stop_migration")
-        msg = "Stop auto migration requests are executed successfully:" + str(rolls)
+        msg = "Stop auto migration requests are executed successfully" + str(rolls)
         wx.MessageBox(msg, 'Info', wx.OK | wx.ICON_INFORMATION)
         self.Close()
 
     def OnCancelAdmissionButton(self, e):
         result, rolls = process_admission(unit, "cancel")
-        msg = "Admissions are cancelled successfully:" + str(rolls)
+        msg = "Admissions are cancelled successfully" + str(rolls)
         wx.MessageBox(msg, 'Info', wx.OK | wx.ICON_INFORMATION)
         self.Close()
 
