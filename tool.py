@@ -1,10 +1,18 @@
+import pyodbc
 import wx
 
 from admission import process_admission
 from migration import execute_migration
+from prepare_database_for_migration import prepare_database
 
 APP_EXIT = 1
 unit = ""
+driver = 'Driver={SQL Server};'
+sever = 'Server=.\sqlexpress;'
+db_name = 'Database=DB_A4A307_Production_Migration_test;'
+auth = 'Trusted_Connection=yes;'
+con = driver + sever + db_name + auth
+connection_string = pyodbc.connect(con)
 
 
 class UI(wx.Frame):
@@ -13,27 +21,35 @@ class UI(wx.Frame):
         super(UI, self).__init__(*args, **kwargs)
         pnl = wx.Panel(self)
         self.sb = self.CreateStatusBar(1)
+        l1 = wx.StaticText(pnl, -1, "Connection String:", pos=(10, 10), size=(200, 50))
+        l3 = wx.StaticText(pnl, -1, str(con), pos=(130, 10), size=(800, 150))
 
-        self.rb1 = wx.RadioButton(pnl, label='Unit A', pos=(100, 10))
-        self.rb2 = wx.RadioButton(pnl, label='Unit B', pos=(300, 10))
-        self.rb3 = wx.RadioButton(pnl, label='Unit C', pos=(500, 10))
-        self.rb4 = wx.RadioButton(pnl, label='Unit D', pos=(100, 40))
-        self.rb5 = wx.RadioButton(pnl, label='Unit E', pos=(300, 40))
-        self.rb6 = wx.RadioButton(pnl, label='Unit F', pos=(500, 40))
-        self.confirmAdmissionButton = wx.Button(pnl, label='Confirm Admissions', pos=(250, 100), size=(200, 35))
+        self.rb1 = wx.RadioButton(pnl, label='Unit A', pos=(150, 90))
+        self.rb2 = wx.RadioButton(pnl, label='Unit B', pos=(300, 90))
+        self.rb3 = wx.RadioButton(pnl, label='Unit C', pos=(450, 90))
+        self.rb4 = wx.RadioButton(pnl, label='Unit D', pos=(150, 120))
+        self.rb5 = wx.RadioButton(pnl, label='Unit E', pos=(300, 120))
+        self.rb6 = wx.RadioButton(pnl, label='Unit F', pos=(450, 120))
+
+        self.prepareDatabase = wx.Button(pnl, label='Get Passed Applicants for Subject Allocation', pos=(230, 200),
+                                         size=(300, 35))
+        self.prepareDatabase.SetBackgroundColour(wx.Colour(255, 255, 255))
+
+        self.confirmAdmissionButton = wx.Button(pnl, label='Confirm Admissions', pos=(230, 250), size=(300, 35))
         self.confirmAdmissionButton.SetBackgroundColour(wx.Colour(255, 255, 255))
 
-        self.stopAutoMigrationButton = wx.Button(pnl, label='Stop Auto Migrations', pos=(250, 170), size=(200, 35))
+        self.stopAutoMigrationButton = wx.Button(pnl, label='Stop Auto Migrations', pos=(230, 300), size=(300, 35))
         self.stopAutoMigrationButton.SetBackgroundColour(wx.Colour(255, 255, 255))
 
-        self.cancelAdmissionButton = wx.Button(pnl, label='Cancel Admission', pos=(250, 240), size=(200, 35))
+        self.cancelAdmissionButton = wx.Button(pnl, label='Cancel Admission', pos=(230, 350), size=(300, 35))
         self.cancelAdmissionButton.SetBackgroundColour(wx.Colour(255, 255, 255))
 
-        self.migrationButton = wx.Button(pnl, label='Subject Allocation and Migration', pos=(250, 310), size=(200, 35))
+        self.migrationButton = wx.Button(pnl, label='Subject Allocation and Migration', pos=(230, 400), size=(300, 35))
         self.migrationButton.SetBackgroundColour(wx.Colour(255, 255, 255))
         self.InitUI()
 
     def InitUI(self):
+
         self.rb1.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
         self.rb2.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
         self.rb3.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
@@ -41,6 +57,7 @@ class UI(wx.Frame):
         self.rb5.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
         self.rb6.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
 
+        self.prepareDatabase.Bind(wx.EVT_BUTTON, self.OnprepareDatabaseButtonPressed)
         self.confirmAdmissionButton.Bind(wx.EVT_BUTTON, self.OnConfirmAdmissionButtonPressed)
         self.stopAutoMigrationButton.Bind(wx.EVT_BUTTON, self.OnStopAutoMigrationButtonPressed)
         self.cancelAdmissionButton.Bind(wx.EVT_BUTTON, self.OnCancelAdmissionButton)
@@ -48,6 +65,10 @@ class UI(wx.Frame):
 
         self.SetSize((800, 600))
         self.Centre()
+
+    def OnprepareDatabaseButtonPressed(self, e):
+        result = prepare_database(connection_string, unit)
+        wx.MessageBox(result, 'Info', wx.OK | wx.ICON_INFORMATION)
 
     def OnConfirmAdmissionButtonPressed(self, e):
         result, positions = process_admission(unit, "confirm")
@@ -57,9 +78,11 @@ class UI(wx.Frame):
 
     def OnStopAutoMigrationButtonPressed(self, e):
         result, positions = process_admission(unit, "stop_migration")
-        msg = unit + " unit stop auto migration requests are executed successfully for position " + str(positions)
-        wx.MessageBox(msg, 'Info', wx.OK | wx.ICON_INFORMATION)
-        self.Close()
+        if result is not None:
+            msg = unit + " unit stop auto migration requests are executed successfully for position " + str(
+                positions)
+            wx.MessageBox(msg, 'Info', wx.OK | wx.ICON_INFORMATION)
+            self.Close()
 
     def OnCancelAdmissionButton(self, e):
         result, positions = process_admission(unit, "cancel")
@@ -69,8 +92,9 @@ class UI(wx.Frame):
 
     def OnMigrationButtonPressed(self, e):
         result = execute_migration(unit)
-        wx.MessageBox(result, 'Info', wx.OK | wx.ICON_INFORMATION)
-        self.Close()
+        if result is not None:
+            wx.MessageBox(result, 'Info', wx.OK | wx.ICON_INFORMATION)
+            self.Close()
 
     def OnQuit(self, e):
         self.Close()

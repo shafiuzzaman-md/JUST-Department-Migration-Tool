@@ -1,3 +1,3 @@
 import py_compile
-output = py_compile.compile('migration.py')
+output = py_compile.compile('tool.py')
 print(output)
