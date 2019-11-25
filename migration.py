@@ -22,7 +22,7 @@ department_ws = wb.create_sheet("Department Status")
 applicants_ws = wb.create_sheet("Applicants Status")
 
 
-def backup_db( ):
+def backup_db():
     currentDirectory = os.getcwd()
     # print(currentDirectory)
     # print("Database backup started...")
@@ -233,7 +233,8 @@ def execute_migration(unit_name):
                 break
 
             logging.info(
-                "------------------------------Migration Started for Position " + str(position) + "----------------------------------")
+                "------------------------------Migration Started for Position " + str(
+                    position) + "----------------------------------")
             applicant_id = get_applicant_id_by_position(position, unit_name)
             logging.info("Id: " + str(applicant_id))
 
