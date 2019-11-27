@@ -4,12 +4,15 @@ import wx
 from admission import process_admission
 from migration import execute_migration
 from prepare_database_for_migration import prepare_database
+from prepare_db_for_unit_F import prepare_database_F
+from migration_F import execute_migration_F
 
 APP_EXIT = 1
 unit = ""
+group = ""
 driver = 'Driver={SQL Server};'
 sever = 'Server=.\sqlexpress;'
-db_name = 'Database=DB_A4A307_Production_Migration_test;'
+db_name = 'Database=DB_A4A307_Migration_Test2;'
 auth = 'Trusted_Connection=yes;'
 con = driver + sever + db_name + auth
 connection_string = pyodbc.connect(con)
@@ -21,15 +24,17 @@ class UI(wx.Frame):
         super(UI, self).__init__(*args, **kwargs)
         pnl = wx.Panel(self)
         self.sb = self.CreateStatusBar(1)
-        l1 = wx.StaticText(pnl, -1, "Connection String:", pos=(10, 10), size=(200, 50))
-        l3 = wx.StaticText(pnl, -1, str(con), pos=(130, 10), size=(800, 150))
+        # l1 = wx.StaticText(pnl, -1, "Connection String:", pos=(10, 10), size=(200, 50))
+        # l3 = wx.StaticText(pnl, -1, str(con), pos=(130, 10), size=(800, 150))
 
         self.rb1 = wx.RadioButton(pnl, label='Unit A', pos=(150, 90))
         self.rb2 = wx.RadioButton(pnl, label='Unit B', pos=(300, 90))
         self.rb3 = wx.RadioButton(pnl, label='Unit C', pos=(450, 90))
         self.rb4 = wx.RadioButton(pnl, label='Unit D', pos=(150, 120))
         self.rb5 = wx.RadioButton(pnl, label='Unit E', pos=(300, 120))
-        self.rb6 = wx.RadioButton(pnl, label='Unit F', pos=(450, 120))
+        self.rb6 = wx.RadioButton(pnl, label='Unit F (BUS)', pos=(450, 120))
+        self.rb7 = wx.RadioButton(pnl, label='Unit F (SCI)', pos=(600, 90))
+        self.rb8 = wx.RadioButton(pnl, label='Unit F (HUM)', pos=(600, 120))
 
         self.prepareDatabase = wx.Button(pnl, label='Get Passed Applicants for Subject Allocation', pos=(230, 200),
                                          size=(300, 35))
@@ -56,6 +61,8 @@ class UI(wx.Frame):
         self.rb4.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
         self.rb5.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
         self.rb6.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
+        self.rb7.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
+        self.rb8.Bind(wx.EVT_RADIOBUTTON, self.SetVal)
 
         self.prepareDatabase.Bind(wx.EVT_BUTTON, self.OnprepareDatabaseButtonPressed)
         self.confirmAdmissionButton.Bind(wx.EVT_BUTTON, self.OnConfirmAdmissionButtonPressed)
@@ -67,7 +74,10 @@ class UI(wx.Frame):
         self.Centre()
 
     def OnprepareDatabaseButtonPressed(self, e):
-        result = prepare_database(connection_string, unit)
+        if unit == 'F':
+            result = prepare_database_F(connection_string, unit, group)
+        else:
+            result = prepare_database(connection_string, unit)
         wx.MessageBox(result, 'Info', wx.OK | wx.ICON_INFORMATION)
 
     def OnConfirmAdmissionButtonPressed(self, e):
@@ -91,7 +101,10 @@ class UI(wx.Frame):
         self.Close()
 
     def OnMigrationButtonPressed(self, e):
-        result = execute_migration(unit)
+        if unit == 'F':
+            result = execute_migration_F(unit, group)
+        else:
+            result = execute_migration(unit)
         if result is not None:
             wx.MessageBox(result, 'Info', wx.OK | wx.ICON_INFORMATION)
             self.Close()
@@ -101,6 +114,7 @@ class UI(wx.Frame):
 
     def SetVal(self, e):
         global unit
+        global group
         if self.rb1.GetValue():
             unit = 'A'
         if self.rb2.GetValue():
@@ -113,11 +127,18 @@ class UI(wx.Frame):
             unit = 'E'
         if self.rb6.GetValue():
             unit = 'F'
+            group = 'BUSINESS STUDIES'
+        if self.rb7.GetValue():
+            unit = 'F'
+            group = 'SCIENCE'
+        if self.rb8.GetValue():
+            unit = 'F'
+            group = 'HUMANITIES'
         msg = "Unit " + unit + " is Selected"
         self.sb.SetStatusText(msg, 0)
 
 
-def main():
+def main( ):
     app = wx.App()
     ex = UI(None, title='JUST Migration Tool')
     ex.Show()

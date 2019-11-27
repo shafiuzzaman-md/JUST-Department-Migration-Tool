@@ -14,7 +14,7 @@ connection_string = pyodbc.connect(
     'Trusted_Connection=yes;')
 
 cursor = connection_string.cursor()
-
+group = ""
 # Excel
 wb = Workbook(write_only=True)
 migration_ws = wb.create_sheet("Migration Result")
@@ -22,7 +22,7 @@ department_ws = wb.create_sheet("Department Status")
 applicants_ws = wb.create_sheet("Applicants Status")
 
 
-def backup_db():
+def backup_db( ):
     currentDirectory = os.getcwd()
     # print(currentDirectory)
     # print("Database backup started...")
@@ -46,7 +46,7 @@ def get_applicants(unit):
     logging.info(
         "Getting Applicants who did not cancelled admission and did not initiate Auto Migration OFF of Unit " + unit)
     try:
-        query = "SELECT * FROM PassedApplicants" + unit + " WHERE [IsAdmissionCancelled] != 1 and [IsAutoMigrationOff] != 1 and UnitName = " + "'" + unit + "'"
+        query = "SELECT * FROM [PassedApplicants" + unit + group + "] WHERE [IsAdmissionCancelled] != 1 and [IsAutoMigrationOff] != 1 and UnitName = " + "'" + unit + "'"
         cursor.execute(query)
         columns = [column[0] for column in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -57,7 +57,7 @@ def get_applicants(unit):
 # get starting position of migration
 def get_first_position(unit):
     logging.info("Getting 1st Applicant...")
-    query = "SELECT MIN(Position) FROM PassedApplicants" + unit + " WHERE [IsAdmissionCancelled] != 1 and [IsAutoMigrationOff] != 1 and UnitName = " + "'" + unit + "'"
+    query = "SELECT MIN(Position) FROM [PassedApplicants" + unit + group + "] WHERE [IsAdmissionCancelled] != 1 and [IsAutoMigrationOff] != 1 and UnitName = " + "'" + unit + "'"
     cursor.execute(query)
     for row in cursor.fetchall():
         return row[0]
@@ -66,7 +66,7 @@ def get_first_position(unit):
 # get starting position of migration
 def get_last_position(unit):
     logging.info("Getting 1st Applicant...")
-    query = "SELECT MAX(Position) FROM PassedApplicants" + unit + " WHERE [IsAdmissionCancelled] != 1 and [IsAutoMigrationOff] != 1 and UnitName = " + "'" + unit + "'"
+    query = "SELECT MAX(Position) FROM [PassedApplicants" + unit + group + "] WHERE [IsAdmissionCancelled] != 1 and [IsAutoMigrationOff] != 1 and UnitName = " + "'" + unit + "'"
     cursor.execute(query)
     for row in cursor.fetchall():
         return row[0]
@@ -74,7 +74,7 @@ def get_last_position(unit):
 
 def get_allotted_subject_order(application_id, unit):
     logging.info("Getting order of allotted department...")
-    query = "SELECT AllottedDepartmentOrder, AllottedDepartmentId FROM PassedApplicants" + unit + " WHERE Id =" + str(
+    query = "SELECT AllottedDepartmentOrder, AllottedDepartmentId FROM [PassedApplicants" + unit + group + "] WHERE Id =" + str(
         application_id)
     cursor.execute(query)
     for row in cursor.fetchall():
@@ -96,7 +96,7 @@ def get_subject_id_by_order(application_table_id, order):
 
 
 def get_department_status_by_id(department_id, unit):
-    query = "SELECT SeatStatus, TotalSeats, AllottedSeats, DepartmentName FROM Departments" + unit + " WHERE Id =" + str(
+    query = "SELECT SeatStatus, TotalSeats, AllottedSeats, DepartmentName FROM [Departments" + unit + group + "] WHERE Id =" + str(
         department_id)
     cursor.execute(query)
     for row in cursor.fetchall():
@@ -104,7 +104,7 @@ def get_department_status_by_id(department_id, unit):
 
 
 def get_departments(unit):
-    query = "SELECT * FROM Departments " + unit + " WHERE SeatStatus = 1"
+    query = "SELECT * FROM [Departments " + unit + group + "] WHERE SeatStatus = 1"
     cursor.execute(query)
     columns = [column[0] for column in cursor.description]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -129,11 +129,11 @@ def allocate_subject(application_table_id, prev_department_order, prev_departmen
                     prev_department_id, unit)
                 p_seat_status = True
                 p_allotted_seats = p_allotted_seats - 1
-                query = "UPDATE Departments" + unit + " SET [SeatStatus] =" + str(
+                query = "UPDATE Departments" + unit + group + " SET [SeatStatus] =" + str(
                     p_seat_status) + " , [AllottedSeats] =" + str(p_allotted_seats) + " , [UpdatedDate] = " + "'" + str(
                     x.strftime("%d%b%I%M%p")) + "'" + " WHERE [Id] =" + str(prev_department_id)
                 cursor.execute(query)
-            query = "UPDATE PassedApplicants" + unit + " SET [AllottedDepartmentId] = " + str(
+            query = "UPDATE [PassedApplicants" + unit + group + "] SET [AllottedDepartmentId] = " + str(
                 subject_id) + " , [AllottedDepartment] =" + "'" + str(
                 department_name) + "'" + " , [AllottedDepartmentOrder] = " + str(
                 order) + " , [UpdatedDate] = " + "'" + str(
@@ -144,7 +144,7 @@ def allocate_subject(application_table_id, prev_department_order, prev_departmen
                 seat_status = 0
             else:
                 seat_status = 1
-            query = "UPDATE Departments" + unit + " SET [SeatStatus] =" + str(
+            query = "UPDATE [Departments" + unit + group + "] SET [SeatStatus] =" + str(
                 seat_status) + " , [AllottedSeats] =" + str(
                 allotted_seats) + " , [UpdatedDate] =" + "'" + str(
                 x.strftime("%d%b%I%M%p")) + "'" + " WHERE [Id] =" + str(
@@ -157,7 +157,7 @@ def allocate_subject(application_table_id, prev_department_order, prev_departmen
 
 
 def get_applicant_id_by_position(applicant_position, unit):
-    query = "SELECT Id FROM PassedApplicants" + unit + " WHERE UnitName = " + "'" + unit + "'" + " AND Position = " + str(
+    query = "SELECT Id FROM [PassedApplicants" + unit + group + "] WHERE UnitName = " + "'" + unit + "'" + " AND Position = " + str(
         applicant_position)
     cursor.execute(query)
     for row in cursor.fetchall():
@@ -193,12 +193,13 @@ def write_migration_data_to_excel(applicants_data):
         count = count + 1
 
 
-def execute_migration(unit_name):
+def execute_migration_F(unit_name, group_name):
     unit_name = unit_name.upper()
-
+    global group
+    group = group_name
     drive = "F"
     os.chdir(drive + ':')  # change directory
-    path = "Unit_" + unit_name + "_Migration" + str(datetime.now().strftime("_%d_%b_%I_%M_%p"))
+    path = "Unit_" + unit_name + group + "_Migration" + str(datetime.now().strftime("_%d_%b_%I_%M_%p"))
     if not os.path.exists(path):
         os.makedirs(path)
     os.chdir(path)
@@ -219,7 +220,7 @@ def execute_migration(unit_name):
         logging.info("Starting Position: " + str(position))
 
         while True:
-            get_no_of_vacant_departments = "SELECT COUNT(SeatStatus) FROM Departments" + unit_name + " WHERE SeatStatus = 1 AND UnitName = " + "'" + unit_name + "'"
+            get_no_of_vacant_departments = "SELECT COUNT(SeatStatus) FROM [Departments" + unit_name + group + "] WHERE SeatStatus = 1 AND UnitName = " + "'" + unit_name + "'"
             cursor.execute(get_no_of_vacant_departments)
             for row in cursor.fetchall():
                 no_of_vacant_departments = row[0]
@@ -258,7 +259,7 @@ def execute_migration(unit_name):
 
         logging.info("Exporting migration result into excel....")
         # get_applicants_query = " SELECT * FROM PassedApplicants WHERE IsAdmissionCancelled = 0 AND AllottedDepartment IS NOT NULL ORDER By Position asc"
-        query = "SELECT * FROM PassedApplicants" + unit_name + " WHERE IsAdmissionCancelled = 0 AND AllottedDepartment IS NOT NULL and UnitName =" + "'" + unit_name + "'" + " ORDER By Position asc"
+        query = "SELECT * FROM [PassedApplicants" + unit_name + group + "] WHERE IsAdmissionCancelled = 0 AND AllottedDepartment IS NOT NULL and UnitName =" + "'" + unit_name + "'" + " ORDER By Position asc"
         migration_data = cursor.execute(query)
 
         # migration_data = cursor.execute(get_applicants_query)
@@ -266,7 +267,7 @@ def execute_migration(unit_name):
 
         logging.info("Exporting department status into excel....")
         # get_departments_query = " SELECT * FROM Departments"
-        query = "SELECT * FROM Departments" + unit_name + " WHERE UnitName = " + "'" + unit_name + "'"
+        query = "SELECT * FROM [Departments" + unit_name + group + "] WHERE UnitName = " + "'" + unit_name + "'"
         department_data = cursor.execute(query)
         # department_data = cursor.execute(get_departments_query)
         write_department_data_to_excel(department_data)
